@@ -1,0 +1,33 @@
+{
+  "name": "kanvaz-mini",
+  "productName": "Kanvaz Mini",
+  "version": "0.1.0",
+  "description": "A small, fast, always-on-top reference window. Drop images, keep them beside your work.",
+  "main": "src/main.js",
+  "author": "Atharva Patil | P4inz | P4inz Interactive Labs",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/board-test.js && node test/files-test.js",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "44.10.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.p4inz.kanvazmini",
+    "productName": "Kanvaz Mini",
+    "directories": { "output": "dist" },
+    "files": ["src/**/*", "assets/**/*", "package.json"],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "linux": { "target": "AppImage" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+  }
+}

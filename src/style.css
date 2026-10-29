@@ -1,0 +1,51 @@
+:root {
+  --bg: #14121f;
+  --bg-2: #1d1a2e;
+  --line: #3a3560;
+  --text: #ece9fb;
+  --text-2: #a9a4cc;
+  --accent: #9a7cff;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; font: 13px/1.4 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; user-select: none; }
+
+#stage { position: fixed; inset: 0; overflow: hidden; outline: none; cursor: default;
+  background-color: var(--bg);
+  background-image: radial-gradient(rgba(255, 255, 255, .07) 1px, transparent 1.2px);
+  background-size: 22px 22px; }
+#stage.panning { cursor: grabbing; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+
+.item { position: absolute; user-select: none; -webkit-user-drag: none; image-rendering: auto; box-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+.item img { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
+.item.sel { outline: calc(2px / var(--z, 1)) solid var(--accent); outline-offset: calc(1px / var(--z, 1)); }
+.handle { position: absolute; width: calc(11px / var(--z, 1)); height: calc(11px / var(--z, 1)); background: #fff; border: calc(2px / var(--z, 1)) solid var(--accent); border-radius: calc(2px / var(--z, 1)); display: none; }
+.item.sel.single .handle { display: block; }
+.handle[data-c="tl"] { left: calc(-6px / var(--z, 1)); top: calc(-6px / var(--z, 1)); cursor: nwse-resize; }
+.handle[data-c="tr"] { right: calc(-6px / var(--z, 1)); top: calc(-6px / var(--z, 1)); cursor: nesw-resize; }
+.handle[data-c="bl"] { left: calc(-6px / var(--z, 1)); bottom: calc(-6px / var(--z, 1)); cursor: nesw-resize; }
+.handle[data-c="br"] { right: calc(-6px / var(--z, 1)); bottom: calc(-6px / var(--z, 1)); cursor: nwse-resize; }
+
+#marquee { position: fixed; border: 1px solid var(--accent); background: rgba(154, 124, 255, .14); pointer-events: none; }
+
+#hint { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; padding: 16px; }
+#hint[hidden] { display: none; }
+.hint-card { text-align: center; color: var(--text-2); display: flex; flex-direction: column; gap: 4px; border: 1px dashed var(--line); border-radius: 14px; padding: 18px 22px; background: rgba(29, 26, 46, .6); }
+.hint-card b { color: var(--text); font-size: 15px; }
+.hint-card small { opacity: .75; }
+body.dragover .hint-card { border-color: var(--accent); color: var(--text); }
+body.dragover #stage { box-shadow: inset 0 0 0 3px var(--accent); }
+
+#bar { position: fixed; top: 0; left: 0; right: 0; height: 26px; display: flex; align-items: center; gap: 2px; padding: 0 4px; opacity: .3; transition: opacity .15s; background: linear-gradient(rgba(20, 18, 31, .85), rgba(20, 18, 31, 0)); }
+#bar:hover { opacity: 1; }
+#grip { flex: 1; height: 100%; -webkit-app-region: drag; cursor: move; background-image: radial-gradient(var(--text-2) 1.1px, transparent 1.3px); background-size: 6px 6px; background-position: 4px center; opacity: .6; }
+#pos { color: var(--text-2); font: 11px ui-monospace, Consolas, monospace; padding: 0 6px; }
+#bar button { -webkit-app-region: no-drag; width: 24px; height: 22px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); font-size: 15px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+#bar button:hover { background: var(--bg-2); color: var(--text); }
+#pin.on { color: var(--accent); }
+#pin::before { content: ""; width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
+#close::before { content: "\00d7"; font-size: 18px; }
+
+#toast { position: fixed; left: 50%; bottom: 14px; transform: translate(-50%, 8px); max-width: calc(100% - 24px); padding: 7px 12px; border-radius: 9px; background: var(--bg-2); border: 1px solid var(--line); color: var(--text); opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; text-align: center; }
+#toast.on { opacity: 1; transform: translate(-50%, 0); }

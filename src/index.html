@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'self'; script-src 'self'">
+<title>Kanvaz Mini</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage" tabindex="0">
+  <div id="world"></div>
+  <div id="marquee" hidden></div>
+</div>
+<div id="hint"><div class="hint-card"><b>Drop images here</b><span>or press Ctrl+V to paste. Ctrl+O opens a file.</span><small>Images and GIFs only. For video, 3D and PDF use Kanvaz.</small></div></div>
+<div id="bar">
+  <div id="grip" title="Drag to move the window"></div>
+  <span id="pos"></span>
+  <button id="pin" type="button" title="Keep on top (P)" aria-label="Keep on top"></button>
+  <button id="op-" type="button" title="More see-through (Ctrl+[)" aria-label="More see-through">&minus;</button>
+  <button id="op+" type="button" title="Less see-through (Ctrl+])" aria-label="Less see-through">+</button>
+  <button id="close" type="button" title="Close" aria-label="Close"></button>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="board.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>
