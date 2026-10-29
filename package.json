@@ -51,8 +51,10 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Kanvaz-Mini-Setup-${version}.${ext}"
+    },
+    "artifactName": "Kanvaz-Mini-${version}.${ext}"
   },
   "homepage": "https://p4inz-code.github.io/kanvaz/guide/kanvaz-mini.html"
 }

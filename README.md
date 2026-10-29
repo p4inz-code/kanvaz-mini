@@ -72,11 +72,11 @@ R, H, V and G act on the selection, or on everything when nothing is selected.
 
 Get the latest build from the Releases page of this repository.
 
-- Windows: `Kanvaz Mini Setup <version>.exe` installs it. `Kanvaz Mini <version>.exe` is a portable copy that needs no install.
-- Linux: the AppImage. Run `chmod +x` on it and start it.
+- Windows: `Kanvaz-Mini-Setup-<version>.exe` installs it. `Kanvaz-Mini-<version>.exe` is a portable copy that needs no install.
+- Linux: `Kanvaz-Mini-<version>.AppImage`. Run `chmod +x` on it and start it.
 - macOS: not targeted yet. Keep-on-top over full-screen apps has not been tested there.
 
-Mini is not code-signed, so Windows SmartScreen will warn you the first time. Choose More info, then Run anyway. The source is here and every release lists its checksums.
+Mini is not code-signed, so Windows SmartScreen will warn you the first time. Choose More info, then Run anyway. Every release has `SHA256SUMS-*.txt` files, so you can check a download with `sha256sum -c`.
 
 ## Guide
 
