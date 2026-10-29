@@ -2,3 +2,4 @@ node_modules/
 dist/
 *.log
 test/fixtures/
+test/live/out/
