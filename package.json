@@ -19,16 +19,40 @@
   "build": {
     "appId": "com.p4inz.kanvazmini",
     "productName": "Kanvaz Mini",
-    "directories": { "output": "dist" },
-    "files": ["src/**/*", "assets/**/*", "package.json"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
     "win": {
       "icon": "assets/icon.ico",
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
-    "linux": { "target": "AppImage" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
-  }
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Graphics"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "homepage": "https://p4inz-code.github.io/kanvaz/guide/kanvaz-mini.html"
 }

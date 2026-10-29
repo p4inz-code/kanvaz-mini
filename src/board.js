@@ -132,6 +132,22 @@ var KMBoard = (function() {
     return out;
   }
 
+
+  /* arrange so the whole block is roughly the shape of the window: tries a range of row widths and keeps the one
+     whose finished block is closest to the wanted width/height ratio, so a screenful of images becomes a wall, not one long strip */
+  function bestArrange(sizes, aspect, gap, targetH) {
+    var best = null, bestScore = Infinity;
+    if (!sizes.length) return [];
+    for (var rw = 300; rw <= 4200; rw += 60) {
+      var rows = arrangeRows(sizes, rw, gap, targetH);
+      var b = bounds(rows.map(function(r) { return { x: r.x, y: r.y, w: r.w, h: r.h }; }));
+      if (!b || b.h <= 0) continue;
+      var score = Math.abs(Math.log((b.w / b.h) / aspect));
+      if (score < bestScore - 1e-9) { bestScore = score; best = rows; }
+    }
+    return best || arrangeRows(sizes, 1000, gap, targetH);
+  }
+
   /* undo/redo over snapshots of the items list (a snapshot is a copy of the array of item copies) */
   function History(limit) {
     this.limit = limit || 50;
@@ -172,7 +188,7 @@ var KMBoard = (function() {
     clamp: clamp, toWorld: toWorld, toScreen: toScreen, zoomAt: zoomAt,
     bounds: bounds, fitView: fitView, hitTest: hitTest, inRect: inRect,
     scaleFromCorner: scaleFromCorner, placeNatural: placeNatural, gridPositions: gridPositions,
-    History: History, readingOrder: readingOrder, rotateBox: rotateBox, arrangeRows: arrangeRows
+    History: History, readingOrder: readingOrder, rotateBox: rotateBox, arrangeRows: arrangeRows, bestArrange: bestArrange
   };
 })();
 

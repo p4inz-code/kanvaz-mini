@@ -14,6 +14,7 @@ var screen = electron.screen;
 var MIN_W = 200, MIN_H = 140;
 var win = null;
 var pendingOpen = [];
+var startedWithFiles = false;
 var clickThrough = false;   /* tracing mode: the window ignores the mouse so you can draw on the app below */
 
 if (!app.requestSingleInstanceLock()) { app.quit(); }
@@ -86,6 +87,11 @@ function createWindow() {
     if (pendingOpen.length) { win.webContents.send('open-files', pendingOpen); pendingOpen = []; }
   });
   win.on('close', saveSettings);
+  /* a renderer crash should not lose the board: reload, and the recovery copy brings it back */
+  win.webContents.on('render-process-gone', function(e, details) {
+    logCrash('renderer gone', details && details.reason);
+    if (win && !win.isDestroyed() && details && details.reason !== 'clean-exit') win.webContents.reload();
+  });
   win.on('closed', function() { win = null; });
 }
 
@@ -105,8 +111,34 @@ function setClickThrough(on) {
   win.webContents.send('click-through', clickThrough);
 }
 
+/* ---------- safety: no network, no permissions, a crash log ---------- */
+function crashLogFile() { return path.join(app.getPath('userData'), 'crash.log'); }
+function logCrash(where, err) {
+  try {
+    var line = new Date().toISOString() + ' ' + where + ': ' + String(err && err.stack || err).replace(/[A-Za-z]:\\Users\\[^\\]+/g, '~') + '\n';
+    var f = crashLogFile();
+    var old = '';
+    try { old = fs.readFileSync(f, 'utf8'); } catch (e) { /* none yet */ }
+    fs.writeFileSync(f, (old + line).slice(-200000));   /* capped at about 200 KB */
+  } catch (e) { /* logging must never throw */ }
+}
+process.on('uncaughtException', function(err) { logCrash('main', err); });
+process.on('unhandledRejection', function(err) { logCrash('main promise', err); });
+
+function lockDownSession() {
+  var ses = electron.session.defaultSession;
+  ses.setPermissionRequestHandler(function(wc, perm, cb) { cb(false); });
+  if (ses.setPermissionCheckHandler) ses.setPermissionCheckHandler(function() { return false; });
+  /* Kanvaz Mini never uses the network: anything that is not a local file, data or blob URL is cancelled */
+  ses.webRequest.onBeforeRequest(function(details, cb) {
+    cb({ cancel: !/^(file|data|blob|devtools|chrome-extension):/i.test(details.url) });
+  });
+}
+
 app.whenReady().then(function() {
+  lockDownSession();
   pendingOpen = argvFiles(process.argv);
+  startedWithFiles = pendingOpen.length > 0;
   createWindow();
   /* a global key, because a click-through window cannot be clicked to turn it off */
   try { electron.globalShortcut.register('CommandOrControl+Alt+T', function() { setClickThrough(!clickThrough); }); } catch (e) { /* another app owns the key; the bar button still works */ }
@@ -121,6 +153,26 @@ ipcMain.handle('toggle-click-through', function() { setClickThrough(!clickThroug
 ipcMain.handle('is-click-through', function() { return clickThrough; });
 /* the renderer lifts the click-through only while the mouse is over the top bar, so the mode can be turned off by hand */
 ipcMain.on('set-ignore-mouse', function(e, flag) { if (win && clickThrough) win.setIgnoreMouseEvents(!!flag, { forward: true }); });
+/* ---------- recovery: the last session comes back, so a quick close never loses references ---------- */
+function recoveryFile() { return path.join(app.getPath('userData'), 'recovery.kmini'); }
+ipcMain.handle('recovery-save', function(e, text) {
+  if (typeof text !== 'string' || text.length > 1200 * 1024 * 1024) return false;
+  try {
+    var tmp = recoveryFile() + '.tmp';
+    fs.writeFileSync(tmp, text, 'utf8');
+    fs.renameSync(tmp, recoveryFile());   /* atomic, so a crash mid-write never leaves a broken file */
+    return true;
+  } catch (err) { return false; }
+});
+ipcMain.handle('recovery-load', function() {
+  if (startedWithFiles) return null;       /* the user opened something specific: do not bring the old session on top of it */
+  try {
+    var parsed = files.parseBoard(fs.readFileSync(recoveryFile(), 'utf8'));
+    return parsed && parsed.items.length ? parsed : null;
+  } catch (err) { return null; }
+});
+ipcMain.handle('app-version', function() { return app.getVersion(); });
+
 ipcMain.on('win-close', function() { if (win) win.close(); });
 ipcMain.on('win-set-on-top', function(e, flag) { if (win) win.setAlwaysOnTop(!!flag, process.platform === 'darwin' ? 'screen-saver' : 'floating'); });
 ipcMain.handle('win-on-top', function() { return win ? win.isAlwaysOnTop() : true; });

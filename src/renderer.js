@@ -90,7 +90,23 @@
     hint.hidden = items.length > 0;
   }
 
-  function changed() { dirty = true; render(); }
+  /* a budget for what is embedded in one board, so saving and recovery never hit the string size limit */
+  var MAX_EMBED_CHARS = 330 * 1024 * 1024;
+  function embeddedChars() { var n = 0; items.forEach(function(it) { n += it.src.length; }); return n; }
+
+  function serialize() {
+    return JSON.stringify({ format: 'kanvaz-mini', version: 1, view: view, items: items.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h, rot: it.rot || 0, fx: !!it.fx, fy: !!it.fy, gray: !!it.gray }; }) });
+  }
+
+  /* recovery copy of the whole board, a few seconds after the last change */
+  var recoveryTimer = null;
+  function scheduleRecovery() {
+    clearTimeout(recoveryTimer);
+    recoveryTimer = setTimeout(function() { window.KMBridge.saveRecovery(serialize()); }, 2500);
+  }
+  window.addEventListener('beforeunload', function() { clearTimeout(recoveryTimer); window.KMBridge.saveRecovery(serialize()); });
+
+  function changed() { dirty = true; render(); scheduleRecovery(); }
   function pushHistory() { hist.push(items); }
 
   /* ---------- adding images ---------- */
@@ -115,6 +131,8 @@
       var failed = srcList.length - sized.length;
       if (failed) toast(failed + (failed === 1 ? ' image' : ' images') + ' could not be read');
       if (!sized.length) return;
+      var incoming = 0; sized.forEach(function(sz) { incoming += sz.src.length; });
+      if (embeddedChars() + incoming > MAX_EMBED_CHARS) { toast('This board is full (about 250 MB of images). Remove some, or start a new board with Ctrl+N'); return; }
       pushHistory();
       var placed = sized.map(function(s) { return B.placeNatural(s.w, s.h, 0, 0, 480); });
       var gp = B.gridPositions(placed, cx - 0, cy - 0, 16, 1400);
@@ -265,13 +283,18 @@
     var list = targets();
     if (list.length < 2) { toast('Select two or more images to arrange'); return; }
     var b = B.bounds(list);
-    var rowW = Math.max(600, Math.min(2400, Math.round(stage.clientWidth / view.z * 0.92)));
-    var pos = B.arrangeRows(list.map(function(it) { return { w: it.w, h: it.h }; }), rowW, 12, 220);
+    var pos = B.bestArrange(list.map(function(it) { return { w: it.w, h: it.h }; }), Math.max(0.6, stage.clientWidth / Math.max(1, stage.clientHeight)), 12, 220);
     pushHistory();
     list.forEach(function(it, i) { it.x = Math.round(b.x + pos[i].x); it.y = Math.round(b.y + pos[i].y); it.w = pos[i].w; it.h = pos[i].h; });
     changed();
     var keep = selected; selected = {}; list.forEach(function(it) { selected[it.id] = true; });
     fit(); selected = keep; render();
+  }
+  function newBoard() {
+    if (items.length && dirty && !window.confirm('Start a new board? Unsaved changes will be lost.')) return;
+    pushHistory();
+    items = []; selected = {}; boardPath = null; dirty = false; view = { x: 0, y: 0, z: 1 };
+    applyView(); render(); scheduleRecovery();
   }
   function toggleHelp() { var h = document.getElementById('help'); h.hidden = !h.hidden; }
 
@@ -312,7 +335,7 @@
   /* ---------- save and open ---------- */
   function saveBoard() {
     if (!items.length) { toast('Nothing to save yet'); return Promise.resolve(); }
-    var text = JSON.stringify({ format: 'kanvaz-mini', version: 1, view: view, items: items.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h, rot: it.rot || 0, fx: !!it.fx, fy: !!it.fy, gray: !!it.gray }; }) });
+    var text = serialize();
     return window.KMBridge.saveBoard(text, boardPath || 'board.kmini').then(function(r) {
       if (r && r.ok) { boardPath = r.path; dirty = false; toast('Saved'); }
       else if (!(r && r.canceled)) toast('Could not save the board');
@@ -449,6 +472,7 @@
     if (ctrl && kl === 'y') { e.preventDefault(); redo(); return; }
     if (ctrl && kl === 'a') { e.preventDefault(); selectAll(); return; }
     if (ctrl && kl === 'd') { e.preventDefault(); duplicateSelected(); return; }
+    if (ctrl && kl === 'n') { e.preventDefault(); newBoard(); return; }
     if (ctrl && kl === 's') { e.preventDefault(); saveBoard(); return; }
     if (ctrl && kl === 'o') { e.preventDefault(); openDialog(); return; }
     if (ctrl && k === '[') { e.preventDefault(); changeOpacity(-0.1); return; }
@@ -542,8 +566,17 @@
   window.addEventListener('resize', function() { applyView(); });
 
   /* a tiny hook for the live test (read-only view of the state) */
-  window.__km = { rotate: rotateSel, flip: flipSel, gray: grayscaleSel, arrange: arrangeSel, items: function() { return items; }, selected: function() { return selIds(); }, view: function() { return view; }, add: addImages, fit: fit };
+  window.__km = { newBoard: newBoard, serialize: serialize, rotate: rotateSel, flip: flipSel, gray: grayscaleSel, arrange: arrangeSel, items: function() { return items; }, selected: function() { return selIds(); }, view: function() { return view; }, add: addImages, fit: fit };
 
   applyView();
   render();
+
+  /* bring back the last session when the app was opened plainly (not by opening a file) */
+  window.KMBridge.loadRecovery().then(function(b) {
+    if (!b || items.length) return;
+    items = b.items; view = b.view; selected = {}; dirty = false;
+    applyView(); render(); fit();
+    toast('Restored your last session');
+  });
+  window.KMBridge.version().then(function(v) { var el = document.getElementById('ver'); if (el) el.textContent = 'Kanvaz Mini ' + v; });
 })();

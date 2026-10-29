@@ -203,5 +203,32 @@ module.exports = async function(cdp) {
   var t2 = await cdp.eval('KMBridge.toggleClickThrough()');
   await cdp.sleep(200);
   ok('28 click-through tracing mode turns on and off', t1 === true && t1b === true && cls === true && t2 === false, { t1: t1, t1b: t1b, cls: cls, t2: t2 });
+
+  /* ---- production checks ---- */
+  var net = await cdp.eval('fetch("https://example.com/").then(function(){return "reached"},function(){return "blocked"})');
+  ok('29 the network is blocked (no request leaves the app)', net === 'blocked', net);
+
+  /* a real path through the OS "open with" route (a PNG on disk) */
+  var nBeforePng = await cdp.eval('__km.items().length');
+  cp.spawn(exe, (packaged ? [] : [ROOT]).concat(['--user-data-dir=' + prof, path.join(FIX, 'amber.png')]), { stdio: 'ignore', detached: true }).unref();
+  await cdp.sleep(2500);
+  ok('30 an image opened by its real path is added', (await cdp.eval('__km.items().length')) === nBeforePng + 1, await cdp.eval('__km.items().length'));
+
+  /* recovery copy */
+  await cdp.sleep(3500);
+  var recFile = path.join(prof, 'recovery.kmini');
+  var recOk = false, recN = -1;
+  try { var rj = JSON.parse(fs.readFileSync(recFile, 'utf8')); recOk = rj.format === 'kanvaz-mini'; recN = rj.items.length; } catch (e) { /* not written */ }
+  ok('31 a recovery copy of the board is written automatically', recOk && recN === (await cdp.eval('__km.items().length')), { recOk: recOk, recN: recN });
+
+  /* new board, then leave exactly one image for the restart test */
+  await cdp.eval('window.confirm = function() { return true; }');
+  await cdp.key('n', 'KeyN', 78, 2, 'n');
+  await cdp.sleep(300);
+  ok('32 Ctrl+N starts an empty board', (await cdp.eval('__km.items().length')) === 0);
+  await cdp.eval(dropJs('violet.png', 'image/png', b64('violet.png')));
+  await cdp.sleep(900);
+  ok('33 and one image can be added to it', (await cdp.eval('__km.items().length')) === 1);
+  await cdp.sleep(3500);
   return r;
 };
