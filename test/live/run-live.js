@@ -122,12 +122,86 @@ module.exports = async function(cdp) {
 
   await cdp.eval('window.confirm = function() { return true; }');   /* the real app asks before replacing unsaved work; the test says yes */
   /* open a saved board through a second launch (the OS "open with" path) */
-  var exe = path.join(ROOT, 'node_modules', 'electron', 'dist', 'electron.exe');
+  var packaged = process.env.KM_EXE;   /* set to test the built app instead of the source tree */
+  var exe = packaged || path.join(ROOT, 'node_modules', 'electron', 'dist', 'electron.exe');
   var prof = process.env.TEMP + '\\kanvaz-mini-test-profile';
-  cp.spawn(exe, [ROOT, '--user-data-dir=' + prof, path.join(FIX, 'sample.kmini')], { stdio: 'ignore', detached: true }).unref();
+  cp.spawn(exe, (packaged ? [] : [ROOT]).concat(['--user-data-dir=' + prof, path.join(FIX, 'sample.kmini')]), { stdio: 'ignore', detached: true }).unref();
   await cdp.sleep(2500);
   var loaded = JSON.parse(await cdp.eval('JSON.stringify({n: __km.items().length, z: __km.view().z})'));
   ok('20 a .kmini board opens through a second launch', loaded.n === 2 && Math.abs(loaded.z - 0.5) < 0.001, loaded);
   await cdp.shot(path.join(OUT, '3-opened-board.png'));
+
+  /* a PureRef .pur board: two PNGs at known positions, half scale */
+  var before2 = await cdp.eval('__km.items().length');
+  cp.spawn(exe, (packaged ? [] : [ROOT]).concat(['--user-data-dir=' + prof, path.join(FIX, 'sample.pur')]), { stdio: 'ignore', detached: true }).unref();
+  await cdp.sleep(3000);
+  var purItems = JSON.parse(await cdp.eval('JSON.stringify(__km.items().slice(-2).map(function(i){return {x:i.x,y:i.y,w:i.w,h:i.h}}))'));
+  ok('21 a PureRef .pur board imports with positions and scale', (await cdp.eval('__km.items().length')) === before2 + 2 && purItems[0].w === 300 && purItems[0].h === 200 && purItems[1].x === 700 && purItems[1].w === 150, purItems);
+  await cdp.shot(path.join(OUT, '4-pur-import.png'));
+
+  /* ---- the PureRef-style extras: rotate, flip, grayscale, arrange, help, click-through ---- */
+  await cdp.eval('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape"}))');
+  var firstId = await cdp.eval('__km.items()[0].id');
+  await cdp.eval('(function(){var el=document.querySelector("[data-id=\\"' + firstId + '\\"]");var b=el.getBoundingClientRect();window.__pt={x:b.left+b.width/2,y:b.top+b.height/2};})()');
+  await cdp.key('f', 'KeyF', 70, 0, 'f');
+  await cdp.sleep(300);
+  var pt = JSON.parse(await cdp.eval('(function(){var el=document.querySelector("[data-id=\\"' + firstId + '\\"]");var b=el.getBoundingClientRect();return JSON.stringify({x:b.left+b.width/2,y:b.top+b.height/2})})()'));
+  await cdp.mouse('mouseMoved', pt.x, pt.y);
+  await cdp.mouse('mousePressed', pt.x, pt.y, { button: 'left', buttons: 1, clickCount: 1 });
+  await cdp.mouse('mouseReleased', pt.x, pt.y, { button: 'left', buttons: 0, clickCount: 1 });
+  await cdp.sleep(200);
+  firstId = await cdp.eval('__km.selected()[0]');   /* whichever card the click landed on (the topmost there) */
+  var before3 = JSON.parse(await cdp.eval('(function(){var it=__km.items().filter(function(x){return x.id==="' + firstId + '"})[0];return JSON.stringify({w:it.w,h:it.h,rot:it.rot||0,x:it.x,y:it.y})})()'));
+  await cdp.key('r', 'KeyR', 82, 0, 'r');
+  await cdp.sleep(250);
+  var after3 = JSON.parse(await cdp.eval('(function(){var it=__km.items().filter(function(x){return x.id==="' + firstId + '"})[0];var pic=document.querySelector("[data-id=\\"' + firstId + '\\"] .pic");return JSON.stringify({w:it.w,h:it.h,rot:it.rot,x:it.x,y:it.y,tf:pic.style.transform})})()'));
+  ok('22 R rotates a quarter turn (box swaps, centre stays)', after3.rot === 1 && after3.w === before3.h && after3.h === before3.w && Math.abs((after3.x + after3.w / 2) - (before3.x + before3.w / 2)) <= 1 && /rotate\(90deg\)/.test(after3.tf), { before3: before3, after3: after3 });
+  await cdp.key('z', 'KeyZ', 90, 2, 'z');
+  await cdp.sleep(250);
+  ok('23 Ctrl+Z undoes the rotation', (await cdp.eval('__km.items().filter(function(x){return x.id==="' + firstId + '"})[0].rot || 0')) === 0);
+  await cdp.key('h', 'KeyH', 72, 0, 'h');
+  await cdp.sleep(200);
+  var fl = JSON.parse(await cdp.eval('(function(){var it=__km.items().filter(function(x){return x.id==="' + firstId + '"})[0];var pic=document.querySelector("[data-id=\\"' + firstId + '\\"] .pic");return JSON.stringify({fx:it.fx,tf:pic.style.transform})})()'));
+  ok('24 H flips left-right', fl.fx === true && /scale\(-1,\s*1\)/.test(fl.tf), fl);
+  await cdp.key('g', 'KeyG', 71, 0, 'g');
+  await cdp.sleep(200);
+  var gOn = await cdp.eval('document.querySelector("[data-id=\\"' + firstId + '\\"] .pic").style.filter');
+  await cdp.key('g', 'KeyG', 71, 0, 'g');
+  await cdp.sleep(200);
+  var gOff = await cdp.eval('document.querySelector("[data-id=\\"' + firstId + '\\"] .pic").style.filter');
+  ok('25 G toggles grayscale on and off', /grayscale\(1\)/.test(gOn) && gOff === '', { gOn: gOn, gOff: gOff });
+
+  /* arrange everything */
+  await cdp.key('a', 'KeyA', 65, 2, 'a');
+  await cdp.sleep(200);
+  await cdp.key('a', 'KeyA', 65, 0, 'a');
+  await cdp.sleep(500);
+  var arr = JSON.parse(await cdp.eval('JSON.stringify(__km.items().map(function(i){return {x:i.x,y:i.y,w:i.w,h:i.h}}))'));
+  var overlap = false;
+  for (var a = 0; a < arr.length; a++) for (var b = a + 1; b < arr.length; b++) {
+    var A = arr[a], Bq = arr[b];
+    if (!(A.x + A.w <= Bq.x + 1 || Bq.x + Bq.w <= A.x + 1 || A.y + A.h <= Bq.y + 1 || Bq.y + Bq.h <= A.y + 1)) overlap = true;
+  }
+  ok('26 A arranges everything into rows with no overlaps', arr.length >= 3 && !overlap, arr);
+  await cdp.shot(path.join(OUT, '5-arranged.png'));
+
+  /* help card */
+  await cdp.key('?', 'Slash', 191, 8, '?');
+  await cdp.sleep(200);
+  var helpOn = await cdp.eval('!document.getElementById("help").hidden');
+  await cdp.eval('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape"}))');
+  await cdp.sleep(150);
+  var helpOff = await cdp.eval('document.getElementById("help").hidden');
+  ok('27 ? opens the key list and Esc closes it', helpOn === true && helpOff === true, { helpOn: helpOn, helpOff: helpOff });
+  await cdp.shot(path.join(OUT, '6-help-check.png'));
+
+  /* click-through tracing mode */
+  var t1 = await cdp.eval('KMBridge.toggleClickThrough()');
+  var t1b = await cdp.eval('KMBridge.isClickThrough()');
+  await cdp.sleep(300);
+  var cls = await cdp.eval('document.body.classList.contains("tracing")');
+  var t2 = await cdp.eval('KMBridge.toggleClickThrough()');
+  await cdp.sleep(200);
+  ok('28 click-through tracing mode turns on and off', t1 === true && t1b === true && cls === true && t2 === false, { t1: t1, t1b: t1b, cls: cls, t2: t2 });
   return r;
 };

@@ -2,6 +2,7 @@
 var electron = require('electron');
 var path = require('path');
 var fs = require('fs');
+var Worker = require('worker_threads').Worker;
 var files = require('./files.js');
 
 var app = electron.app;
@@ -13,6 +14,7 @@ var screen = electron.screen;
 var MIN_W = 200, MIN_H = 140;
 var win = null;
 var pendingOpen = [];
+var clickThrough = false;   /* tracing mode: the window ignores the mouse so you can draw on the app below */
 
 if (!app.requestSingleInstanceLock()) { app.quit(); }
 
@@ -46,7 +48,7 @@ function saveSettings() {
 }
 
 function argvFiles(argv) {
-  return argv.slice(1).filter(function(a) { return typeof a === 'string' && a && a.charAt(0) !== '-' && files.isSafeLocalPath(a) && (files.isImagePath(a) || files.isBoardPath(a)); });
+  return argv.slice(1).filter(function(a) { return typeof a === 'string' && a && a.charAt(0) !== '-' && files.isSafeLocalPath(a) && (files.isImagePath(a) || files.isBoardPath(a) || files.isPurPath(a)); });
 }
 
 function createWindow() {
@@ -96,14 +98,29 @@ app.on('second-instance', function(event, argv) {
   }
 });
 
+function setClickThrough(on) {
+  clickThrough = !!on;
+  if (!win) return;
+  win.setIgnoreMouseEvents(clickThrough, { forward: true });
+  win.webContents.send('click-through', clickThrough);
+}
+
 app.whenReady().then(function() {
   pendingOpen = argvFiles(process.argv);
   createWindow();
+  /* a global key, because a click-through window cannot be clicked to turn it off */
+  try { electron.globalShortcut.register('CommandOrControl+Alt+T', function() { setClickThrough(!clickThrough); }); } catch (e) { /* another app owns the key; the bar button still works */ }
 });
+
+app.on('will-quit', function() { try { electron.globalShortcut.unregisterAll(); } catch (e) { /* ignore */ } });
 
 app.on('window-all-closed', function() { app.quit(); });
 
 /* ---------- IPC ---------- */
+ipcMain.handle('toggle-click-through', function() { setClickThrough(!clickThrough); return clickThrough; });
+ipcMain.handle('is-click-through', function() { return clickThrough; });
+/* the renderer lifts the click-through only while the mouse is over the top bar, so the mode can be turned off by hand */
+ipcMain.on('set-ignore-mouse', function(e, flag) { if (win && clickThrough) win.setIgnoreMouseEvents(!!flag, { forward: true }); });
 ipcMain.on('win-close', function() { if (win) win.close(); });
 ipcMain.on('win-set-on-top', function(e, flag) { if (win) win.setAlwaysOnTop(!!flag, process.platform === 'darwin' ? 'screen-saver' : 'floating'); });
 ipcMain.handle('win-on-top', function() { return win ? win.isAlwaysOnTop() : true; });
@@ -135,11 +152,37 @@ ipcMain.handle('read-board', function(e, p) {
   } catch (err) { return { ok: false, reason: 'unreadable' }; }
 });
 
+/* PureRef boards: parsed in a worker thread so a big file never freezes the window. Only real local .pur paths,
+   size capped, 30 s backstop, and only image data URLs come back. */
+ipcMain.handle('read-pur', function(e, p) {
+  if (!files.isSafeLocalPath(p) || !files.isPurPath(p)) return Promise.resolve({ ok: false, reason: 'not-pur' });
+  var st;
+  try { st = fs.statSync(p); } catch (err) { return Promise.resolve({ ok: false, reason: 'unreadable' }); }
+  if (!st.isFile() || st.size > 900 * 1024 * 1024) return Promise.resolve({ ok: false, reason: 'too-big' });
+  return fs.promises.readFile(p).then(function(buffer) {
+    return new Promise(function(resolve) {
+      var worker = new Worker(path.join(__dirname, 'pur-import-worker.js'));
+      var done = false;
+      var timer = setTimeout(function() { if (!done) { done = true; worker.terminate(); resolve({ ok: false, reason: 'timeout' }); } }, 30000);
+      worker.once('message', function(m) {
+        if (done) return;
+        done = true; clearTimeout(timer); worker.terminate();
+        if (!m || !m.ok || !Array.isArray(m.images)) { resolve({ ok: false, reason: 'invalid' }); return; }
+        var imgs = m.images.slice(0, files.MAX_ITEMS).filter(function(i) { return i && typeof i.dataUrl === 'string' && /^data:image\/(png|jpeg|gif|webp|bmp);base64,/.test(i.dataUrl); })
+          .map(function(i) { return { src: i.dataUrl, x: Number(i.x) || 0, y: Number(i.y) || 0, sx: Number(i.scaleX) || 1, sy: Number(i.scaleY) || 1 }; });
+        resolve({ ok: true, images: imgs, total: m.images.length });
+      });
+      worker.once('error', function() { if (!done) { done = true; clearTimeout(timer); resolve({ ok: false, reason: 'invalid' }); } });
+      worker.postMessage(buffer);
+    });
+  }).catch(function() { return { ok: false, reason: 'unreadable' }; });
+});
+
 ipcMain.handle('open-dialog', function() {
   return dialog.showOpenDialog(win, {
     title: 'Open images or a Kanvaz Mini board',
     properties: ['openFile', 'multiSelections'],
-    filters: [{ name: 'Images and boards', extensions: files.IMAGE_EXTS.concat([files.BOARD_EXT]) }]
+    filters: [{ name: 'Images, boards and PureRef files', extensions: files.IMAGE_EXTS.concat([files.BOARD_EXT, files.PUR_EXT]) }]
   }).then(function(r) { return r.canceled ? [] : r.filePaths; });
 });
 

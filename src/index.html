@@ -15,10 +15,33 @@
 <div id="bar">
   <div id="grip" title="Drag to move the window"></div>
   <span id="pos"></span>
+  <button id="trace" type="button" title="Click-through tracing mode (Ctrl+Alt+T)" aria-label="Click-through mode"></button>
   <button id="pin" type="button" title="Keep on top (P)" aria-label="Keep on top"></button>
   <button id="op-" type="button" title="More see-through (Ctrl+[)" aria-label="More see-through">&minus;</button>
   <button id="op+" type="button" title="Less see-through (Ctrl+])" aria-label="Less see-through">+</button>
   <button id="close" type="button" title="Close" aria-label="Close"></button>
+</div>
+<div id="help" hidden>
+  <div class="help-card">
+    <div class="help-head"><b>Kanvaz Mini keys</b><button id="help-close" type="button" aria-label="Close help">&times;</button></div>
+    <div class="help-grid">
+      <span>Drop, Ctrl+V, Ctrl+O</span><span>Add images</span>
+      <span>Drag / corner</span><span>Move / scale</span>
+      <span>R / Shift+R</span><span>Rotate a quarter turn</span>
+      <span>H / V</span><span>Flip left-right / up-down</span>
+      <span>G</span><span>Grayscale (value check)</span>
+      <span>A</span><span>Arrange into tidy rows</span>
+      <span>F / 0 / wheel</span><span>Fit / 100% / zoom</span>
+      <span>Space or middle drag</span><span>Pan</span>
+      <span>Arrows</span><span>Nudge, or step references</span>
+      <span>Ctrl+[ / Ctrl+]</span><span>Window opacity</span>
+      <span>P</span><span>Keep on top</span>
+      <span>Ctrl+Alt+T</span><span>Click-through tracing</span>
+      <span>Ctrl+Z / Ctrl+Y</span><span>Undo / redo</span>
+      <span>Ctrl+S / Ctrl+O</span><span>Save / open</span>
+    </div>
+    <small>R, H, V and G act on the selection, or on everything when nothing is selected.</small>
+  </div>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="board.js"></script>

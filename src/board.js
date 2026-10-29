@@ -96,6 +96,42 @@ var KMBoard = (function() {
     return out;
   }
 
+
+  /* a quarter turn: the displayed box swaps width and height around its own centre */
+  function rotateBox(it, dir) {
+    var cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+    var nw = it.h, nh = it.w;
+    return { x: Math.round(cx - nw / 2), y: Math.round(cy - nh / 2), w: nw, h: nh, rot: ((it.rot || 0) + (dir < 0 ? 3 : 1)) % 4 };
+  }
+
+  /* "justified rows": every row is scaled to one height and to exactly rowWidth, like a photo wall.
+     sizes: [{ w, h }] in order; returns [{ x, y, w, h }] relative to (0, 0). */
+  function arrangeRows(sizes, rowWidth, gap, targetH) {
+    gap = gap === undefined ? 12 : gap;
+    var out = [], row = [], sumAr = 0, y = 0;
+    function flush(last) {
+      if (!row.length) return;
+      var avail = rowWidth - gap * (row.length - 1);
+      var h = last && avail / sumAr > targetH * 1.5 ? targetH : avail / sumAr;   /* a short last row keeps the target height */
+      var x = 0;
+      row.forEach(function(r) {
+        var w = Math.max(MIN_SIZE, Math.round(h * r.ar));
+        out[r.i] = { x: x, y: Math.round(y), w: w, h: Math.max(MIN_SIZE, Math.round(h)) };
+        x += w + gap;
+      });
+      y += h + gap;
+      row = []; sumAr = 0;
+    }
+    sizes.forEach(function(s, i) {
+      var ar = s.w / s.h;
+      row.push({ i: i, ar: ar }); sumAr += ar;
+      var avail = rowWidth - gap * (row.length - 1);
+      if (avail / sumAr <= targetH) flush(false);
+    });
+    flush(true);
+    return out;
+  }
+
   /* undo/redo over snapshots of the items list (a snapshot is a copy of the array of item copies) */
   function History(limit) {
     this.limit = limit || 50;
@@ -103,7 +139,7 @@ var KMBoard = (function() {
     this.future = [];
   }
   History.prototype.snapshot = function(items) {
-    return items.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h }; });
+    return items.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h, rot: it.rot || 0, fx: !!it.fx, fy: !!it.fy, gray: !!it.gray }; });
   };
   History.prototype.push = function(items) {
     this.past.push(this.snapshot(items));
@@ -136,7 +172,7 @@ var KMBoard = (function() {
     clamp: clamp, toWorld: toWorld, toScreen: toScreen, zoomAt: zoomAt,
     bounds: bounds, fitView: fitView, hitTest: hitTest, inRect: inRect,
     scaleFromCorner: scaleFromCorner, placeNatural: placeNatural, gridPositions: gridPositions,
-    History: History, readingOrder: readingOrder
+    History: History, readingOrder: readingOrder, rotateBox: rotateBox, arrangeRows: arrangeRows
   };
 })();
 

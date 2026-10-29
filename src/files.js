@@ -3,6 +3,7 @@
 
 var IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
 var BOARD_EXT = 'kmini';
+var PUR_EXT = 'pur';
 var MAX_IMAGE_BYTES = 60 * 1024 * 1024;
 var MAX_ITEMS = 500;
 
@@ -18,12 +19,13 @@ function extOf(p) {
 
 function isImagePath(p) { return IMAGE_EXTS.indexOf(extOf(p)) !== -1; }
 function isBoardPath(p) { return extOf(p) === BOARD_EXT; }
+function isPurPath(p) { return extOf(p) === PUR_EXT; }
 function mimeFor(p) { return MIME[extOf(p)] || null; }
 
 /* a file name has an extension but is not something Mini shows: video, audio, 3D, PDF, Adobe... */
 function isRefused(p) {
   var e = extOf(p);
-  return e !== '' && IMAGE_EXTS.indexOf(e) === -1 && e !== BOARD_EXT;
+  return e !== '' && IMAGE_EXTS.indexOf(e) === -1 && e !== BOARD_EXT && e !== PUR_EXT;
 }
 
 /* an absolute local path only (no UNC or device paths, no URLs), as handed over by the OS or a drop */
@@ -48,7 +50,7 @@ function parseBoard(text) {
     var it = data.items[i];
     if (!it || typeof it.src !== 'string' || !/^data:image\/(png|jpeg|gif|webp|bmp);base64,/.test(it.src)) return null;
     if (!isNum(it.x) || !isNum(it.y) || !isNum(it.w) || !isNum(it.h) || it.w <= 0 || it.h <= 0) return null;
-    items.push({ id: typeof it.id === 'string' ? it.id : 'i' + i, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h });
+    items.push({ id: typeof it.id === 'string' ? it.id : 'i' + i, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h, rot: (it.rot === 1 || it.rot === 2 || it.rot === 3) ? it.rot : 0, fx: it.fx === true, fy: it.fy === true, gray: it.gray === true });
   }
   var v = data.view || {};
   var view = { x: isNum(v.x) ? v.x : 0, y: isNum(v.y) ? v.y : 0, z: isNum(v.z) && v.z > 0 ? v.z : 1 };
@@ -60,7 +62,7 @@ function serializeBoard(items, view) {
 }
 
 module.exports = {
-  IMAGE_EXTS: IMAGE_EXTS, BOARD_EXT: BOARD_EXT, MAX_IMAGE_BYTES: MAX_IMAGE_BYTES, MAX_ITEMS: MAX_ITEMS,
-  extOf: extOf, isImagePath: isImagePath, isBoardPath: isBoardPath, isRefused: isRefused, mimeFor: mimeFor,
+  IMAGE_EXTS: IMAGE_EXTS, BOARD_EXT: BOARD_EXT, PUR_EXT: PUR_EXT, MAX_IMAGE_BYTES: MAX_IMAGE_BYTES, MAX_ITEMS: MAX_ITEMS,
+  extOf: extOf, isImagePath: isImagePath, isBoardPath: isBoardPath, isPurPath: isPurPath, isRefused: isRefused, mimeFor: mimeFor,
   isSafeLocalPath: isSafeLocalPath, parseBoard: parseBoard, serializeBoard: serializeBoard
 };

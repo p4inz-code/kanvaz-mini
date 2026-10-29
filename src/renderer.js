@@ -53,11 +53,14 @@
         el = document.createElement('div');
         el.className = 'item';
         el.dataset.id = it.id;
+        var pic = document.createElement('div');
+        pic.className = 'pic';
         var img = document.createElement('img');
         img.src = it.src;
         img.alt = '';
         img.draggable = false;
-        el.appendChild(img);
+        pic.appendChild(img);
+        el.appendChild(pic);
         ['tl', 'tr', 'bl', 'br'].forEach(function(c) {
           var h = document.createElement('div');
           h.className = 'handle';
@@ -72,6 +75,12 @@
       el.style.width = it.w + 'px';
       el.style.height = it.h + 'px';
       el.style.zIndex = String(i);
+      var pic2 = el.firstChild;
+      var odd = (it.rot || 0) % 2 === 1;
+      pic2.style.width = (odd ? it.h : it.w) + 'px';
+      pic2.style.height = (odd ? it.w : it.h) + 'px';
+      pic2.style.transform = 'translate(-50%,-50%) scale(' + (it.fx ? -1 : 1) + ',' + (it.fy ? -1 : 1) + ') rotate(' + ((it.rot || 0) * 90) + 'deg)';
+      pic2.style.filter = it.gray ? 'grayscale(1)' : '';
       el.classList.toggle('sel', !!selected[it.id]);
       el.classList.toggle('single', !!selected[it.id] && single);
     });
@@ -112,7 +121,7 @@
       selected = {};
       sized.forEach(function(s, i) {
         var p = placed[i];
-        var it = { id: newId(), src: s.src, x: sized.length === 1 ? Math.round(cx - p.w / 2) : gp[i].x, y: sized.length === 1 ? Math.round(cy - p.h / 2) : gp[i].y, w: p.w, h: p.h };
+        var it = { id: newId(), rot: 0, fx: false, fy: false, gray: false, src: s.src, x: sized.length === 1 ? Math.round(cx - p.w / 2) : gp[i].x, y: sized.length === 1 ? Math.round(cy - p.h / 2) : gp[i].y, w: p.w, h: p.h };
         items.push(it);
         selected[it.id] = true;
       });
@@ -122,15 +131,17 @@
   }
 
   function addPaths(paths, at) {
-    var imgs = [], boards = [], refused = 0;
+    var imgs = [], boards = [], purs = [], refused = 0;
     paths.forEach(function(p) {
-      if (/\.kmini$/i.test(p)) boards.push(p);
+      if (/\.pur$/i.test(p)) purs.push(p);
+      else if (/\.kmini$/i.test(p)) boards.push(p);
       else if (/\.(png|jpe?g|gif|webp|bmp)$/i.test(p)) imgs.push(p);
       else refused++;
     });
     if (refused) toast('Mini shows images only. Open video, 3D, PDF and PSD files in Kanvaz');
     var chain = Promise.resolve();
     if (boards.length) chain = chain.then(function() { return openBoard(boards[0]); });
+    purs.forEach(function(p) { chain = chain.then(function() { return importPur(p); }); });
     if (imgs.length) {
       chain = chain.then(function() {
         return Promise.all(imgs.map(function(p) { return window.KMBridge.readImage(p); })).then(function(rs) {
@@ -206,7 +217,7 @@
     pushHistory();
     var next = {};
     sel.forEach(function(it) {
-      var c = { id: newId(), src: it.src, x: it.x + 24, y: it.y + 24, w: it.w, h: it.h };
+      var c = { id: newId(), src: it.src, x: it.x + 24, y: it.y + 24, w: it.w, h: it.h, rot: it.rot || 0, fx: !!it.fx, fy: !!it.fy, gray: !!it.gray };
       items.push(c);
       next[c.id] = true;
     });
@@ -214,7 +225,7 @@
     changed();
   }
   function restore(snap) {
-    items = snap.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h }; });
+    items = snap.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h, rot: it.rot || 0, fx: !!it.fx, fy: !!it.fy, gray: !!it.gray }; });
     var keep = {};
     items.forEach(function(it) { if (selected[it.id]) keep[it.id] = true; });
     selected = keep;
@@ -222,6 +233,48 @@
   }
   function undo() { var s = hist.undo(items); if (s) restore(s); }
   function redo() { var s = hist.redo(items); if (s) restore(s); }
+  /* the targets of a one-key action: the selection, or everything when nothing is selected */
+  function targets() { var sel = selItems(); return sel.length ? sel : items; }
+
+  function rotateSel(dir) {
+    var list = targets();
+    if (!list.length) return;
+    pushHistory();
+    list.forEach(function(it) { var n = B.rotateBox(it, dir); it.x = n.x; it.y = n.y; it.w = n.w; it.h = n.h; it.rot = n.rot; });
+    changed();
+  }
+  function flipSel(axis) {
+    var list = targets();
+    if (!list.length) return;
+    pushHistory();
+    list.forEach(function(it) { if (axis === 'x') it.fx = !it.fx; else it.fy = !it.fy; });
+    changed();
+  }
+  /* grayscale: a value check. On the selection, or on everything when nothing is selected */
+  function grayscaleSel() {
+    var list = targets();
+    if (!list.length) return;
+    var turnOn = list.some(function(it) { return !it.gray; });
+    pushHistory();
+    list.forEach(function(it) { it.gray = turnOn; });
+    changed();
+    toast(turnOn ? 'Grayscale on' : 'Grayscale off');
+  }
+  /* one key to tidy: justified rows, anchored where the group's top-left is */
+  function arrangeSel() {
+    var list = targets();
+    if (list.length < 2) { toast('Select two or more images to arrange'); return; }
+    var b = B.bounds(list);
+    var rowW = Math.max(600, Math.min(2400, Math.round(stage.clientWidth / view.z * 0.92)));
+    var pos = B.arrangeRows(list.map(function(it) { return { w: it.w, h: it.h }; }), rowW, 12, 220);
+    pushHistory();
+    list.forEach(function(it, i) { it.x = Math.round(b.x + pos[i].x); it.y = Math.round(b.y + pos[i].y); it.w = pos[i].w; it.h = pos[i].h; });
+    changed();
+    var keep = selected; selected = {}; list.forEach(function(it) { selected[it.id] = true; });
+    fit(); selected = keep; render();
+  }
+  function toggleHelp() { var h = document.getElementById('help'); h.hidden = !h.hidden; }
+
   function selectAll() { selected = {}; items.forEach(function(it) { selected[it.id] = true; }); render(); }
 
   function step(dir) {
@@ -236,10 +289,30 @@
     posEl.textContent = (stepIdx + 1) + ' / ' + order.length;
   }
 
+  /* ---------- PureRef boards ---------- */
+  function importPur(p) {
+    toast('Importing PureRef board...');
+    return window.KMBridge.readPur(p).then(function(r) {
+      if (!r || !r.ok || !r.images.length) { toast('Could not read images from that PureRef file'); return; }
+      return Promise.all(r.images.map(function(i) {
+        return loadImage(i.src).then(function(sz) { return { src: i.src, x: i.x, y: i.y, w: Math.max(B.MIN_SIZE, Math.round(sz.w * i.sx)), h: Math.max(B.MIN_SIZE, Math.round(sz.h * i.sy)) }; }, function() { return null; });
+      })).then(function(list) {
+        list = list.filter(Boolean);
+        if (!list.length) { toast('Could not read images from that PureRef file'); return; }
+        pushHistory();
+        selected = {};
+        list.forEach(function(s) { items.push({ id: newId(), rot: 0, fx: false, fy: false, gray: false, src: s.src, x: s.x, y: s.y, w: s.w, h: s.h }); });
+        changed();
+        fit();
+        toast('Imported ' + list.length + (list.length === 1 ? ' image' : ' images') + ' from PureRef');
+      });
+    });
+  }
+
   /* ---------- save and open ---------- */
   function saveBoard() {
     if (!items.length) { toast('Nothing to save yet'); return Promise.resolve(); }
-    var text = JSON.stringify({ format: 'kanvaz-mini', version: 1, view: view, items: items.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h }; }) });
+    var text = JSON.stringify({ format: 'kanvaz-mini', version: 1, view: view, items: items.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h, rot: it.rot || 0, fx: !!it.fx, fy: !!it.fy, gray: !!it.gray }; }) });
     return window.KMBridge.saveBoard(text, boardPath || 'board.kmini').then(function(r) {
       if (r && r.ok) { boardPath = r.path; dirty = false; toast('Saved'); }
       else if (!(r && r.canceled)) toast('Could not save the board');
@@ -314,7 +387,7 @@
       var dx = w.x - drag.start.x, dy = w.y - drag.start.y;
       if (!drag.pushed && (Math.abs(dx) > 1 || Math.abs(dy) > 1)) {
         /* the undo snapshot is the state before this drag started */
-        var snap = items.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h }; });
+        var snap = hist.snapshot(items);
         drag.origs.forEach(function(o) { var s = snap.filter(function(x) { return x.id === o.it.id; })[0]; if (s) { s.x = o.x; s.y = o.y; } });
         hist.past.push(snap); if (hist.past.length > hist.limit) hist.past.shift(); hist.future = [];
         drag.pushed = true;
@@ -324,7 +397,7 @@
     } else if (drag.mode === 'scale') {
       var wp = worldPt(e);
       if (!drag.pushed) {
-        var snap2 = items.map(function(it) { return { id: it.id, src: it.src, x: it.x, y: it.y, w: it.w, h: it.h }; });
+        var snap2 = hist.snapshot(items);
         var s2 = snap2.filter(function(x) { return x.id === drag.item.id; })[0];
         if (s2) { s2.x = drag.orig.x; s2.y = drag.orig.y; s2.w = drag.orig.w; s2.h = drag.orig.h; }
         hist.past.push(snap2); if (hist.past.length > hist.limit) hist.past.shift(); hist.future = [];
@@ -387,7 +460,13 @@
     if (k === '+' || k === '=') { zoomBy(1.2); return; }
     if (k === '-') { zoomBy(1 / 1.2); return; }
     if (kl === 'p') { togglePin(); return; }
-    if (k === 'Escape') { selected = {}; render(); return; }
+    if (kl === 'r') { e.preventDefault(); rotateSel(e.shiftKey ? -1 : 1); return; }
+    if (kl === 'h') { flipSel('x'); return; }
+    if (kl === 'v') { flipSel('y'); return; }
+    if (kl === 'g') { grayscaleSel(); return; }
+    if (kl === 'a') { arrangeSel(); return; }
+    if (k === '?' || k === '/') { toggleHelp(); return; }
+    if (k === 'Escape') { var hp = document.getElementById('help'); if (!hp.hidden) { hp.hidden = true; return; } selected = {}; render(); return; }
     if (k.indexOf('Arrow') === 0) {
       e.preventDefault();
       var sel = selItems();
@@ -438,6 +517,19 @@
     window.KMBridge.setOpacity(opacity);
     toast('Window opacity ' + Math.round(opacity * 100) + '%');
   }
+  var traceBtn = document.getElementById('trace');
+  function showTrace(on) {
+    document.body.classList.toggle('tracing', !!on);
+    traceBtn.classList.toggle('on', !!on);
+    toast(on ? 'Click-through on: clicks pass to the app below. Ctrl+Alt+T or the bar turns it off' : 'Click-through off');
+  }
+  traceBtn.addEventListener('click', function() { window.KMBridge.toggleClickThrough().then(showTrace); });
+  window.KMBridge.onClickThrough(showTrace);
+  /* while click-through is on the window ignores the mouse, except over the top bar so it can be turned off again */
+  var barEl = document.getElementById('bar');
+  barEl.addEventListener('mouseenter', function() { window.KMBridge.setIgnoreMouse(false); });
+  barEl.addEventListener('mouseleave', function() { if (document.body.classList.contains('tracing')) window.KMBridge.setIgnoreMouse(true); });
+  document.getElementById('help-close').addEventListener('click', toggleHelp);
   pinBtn.addEventListener('click', togglePin);
   document.getElementById('op-').addEventListener('click', function() { changeOpacity(-0.1); });
   document.getElementById('op+').addEventListener('click', function() { changeOpacity(0.1); });
@@ -450,7 +542,7 @@
   window.addEventListener('resize', function() { applyView(); });
 
   /* a tiny hook for the live test (read-only view of the state) */
-  window.__km = { items: function() { return items; }, selected: function() { return selIds(); }, view: function() { return view; }, add: addImages, fit: fit };
+  window.__km = { rotate: rotateSel, flip: flipSel, gray: grayscaleSel, arrange: arrangeSel, items: function() { return items; }, selected: function() { return selIds(); }, view: function() { return view; }, add: addImages, fit: fit };
 
   applyView();
   render();

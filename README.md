@@ -8,13 +8,18 @@ Free, MIT, no account, no network access at all.
 
 ## Status
 
-Version 0.1.0, first slice. Windows and Linux are the targets. macOS is untested (the keep-on-top behaviour over full-screen apps is not verified).
+Version 0.1.0, first slice, built after looking at what PureRef users use and ask for: rotate, flip, grayscale, arrange, a tracing mode and an always-on-top you can toggle, in an app with no setup and nothing to learn. Windows and Linux are the targets. macOS is untested (the keep-on-top behaviour over full-screen apps is not verified).
 
 ## What it does
 
 - Opens small in the corner of your screen, always on top. Remembers where you put it.
 - Drop images or GIFs, paste from the clipboard, or press `Ctrl+O`.
-- Move, scale from a corner (aspect ratio kept), delete, duplicate, undo and redo (50 steps).
+- Move, scale from a corner (aspect ratio kept), rotate a quarter turn, flip, delete, duplicate, undo and redo (50 steps).
+- One key to tidy: `A` arranges the selection (or everything) into even rows like a photo wall.
+- One key for a value check: `G` turns the selection (or everything) to grayscale and back.
+- Click-through tracing mode (`Ctrl+Alt+T`): the window ignores the mouse so you can draw on the app underneath, with Mini floating over it at whatever opacity you set. A frame shows when it is on, and the top bar stays clickable to turn it off.
+- Opens PureRef `.pur` boards with every image at its saved position and scale.
+- Press `?` for the full key list at any time.
 - Zoom with the wheel, pan with the middle mouse button, right mouse button or `Space` + drag, `F` to fit, `0` for 100%.
 - Left and right arrow keys step through your references one at a time when nothing is selected.
 - Window opacity with `Ctrl+[` and `Ctrl+]`, keep-on-top with `P`.
@@ -32,6 +37,12 @@ Version 0.1.0, first slice. Windows and Linux are the targets. macOS is untested
 | Middle or right drag, or `Space` + drag | Pan |
 | Wheel | Zoom |
 | `F` / `0` / `+` / `-` | Fit / 100% / zoom in / zoom out |
+| `R` / `Shift+R` | Rotate the selection a quarter turn (all images if nothing is selected) |
+| `H` / `V` | Flip left-right / up-down |
+| `G` | Grayscale on and off |
+| `A` | Arrange into tidy rows |
+| `?` | Show the key list |
+| `Ctrl+Alt+T` | Click-through tracing mode |
 | `Delete` | Remove the selection |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
 | `Ctrl+A` / `Ctrl+D` | Select all / duplicate |
