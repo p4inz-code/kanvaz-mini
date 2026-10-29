@@ -122,11 +122,12 @@ module.exports = async function(cdp) {
 
   await cdp.eval('window.confirm = function() { return true; }');   /* the real app asks before replacing unsaved work; the test says yes */
   /* open a saved board through a second launch (the OS "open with" path) */
-  var packaged = process.env.KM_EXE;   /* set to test the built app instead of the source tree */
+  var packaged = process.env.KM_EXE;
+  var LAUNCH_WAIT = process.env.KM_EXE && /portable|Kanvaz-Mini-\d/.test(process.env.KM_EXE) ? 9000 : 2500;   /* a portable exe unpacks itself on every start */   /* set to test the built app instead of the source tree */
   var exe = packaged || path.join(ROOT, 'node_modules', 'electron', 'dist', 'electron.exe');
   var prof = process.env.TEMP + '\\kanvaz-mini-test-profile';
   cp.spawn(exe, (packaged ? [] : [ROOT]).concat(['--user-data-dir=' + prof, path.join(FIX, 'sample.kmini')]), { stdio: 'ignore', detached: true }).unref();
-  await cdp.sleep(2500);
+  await cdp.sleep(LAUNCH_WAIT);
   var loaded = JSON.parse(await cdp.eval('JSON.stringify({n: __km.items().length, z: __km.view().z})'));
   ok('20 a .kmini board opens through a second launch', loaded.n === 2 && Math.abs(loaded.z - 0.5) < 0.001, loaded);
   await cdp.shot(path.join(OUT, '3-opened-board.png'));
@@ -134,7 +135,7 @@ module.exports = async function(cdp) {
   /* a PureRef .pur board: two PNGs at known positions, half scale */
   var before2 = await cdp.eval('__km.items().length');
   cp.spawn(exe, (packaged ? [] : [ROOT]).concat(['--user-data-dir=' + prof, path.join(FIX, 'sample.pur')]), { stdio: 'ignore', detached: true }).unref();
-  await cdp.sleep(3000);
+  await cdp.sleep(LAUNCH_WAIT);
   var purItems = JSON.parse(await cdp.eval('JSON.stringify(__km.items().slice(-2).map(function(i){return {x:i.x,y:i.y,w:i.w,h:i.h}}))'));
   ok('21 a PureRef .pur board imports with positions and scale', (await cdp.eval('__km.items().length')) === before2 + 2 && purItems[0].w === 300 && purItems[0].h === 200 && purItems[1].x === 700 && purItems[1].w === 150, purItems);
   await cdp.shot(path.join(OUT, '4-pur-import.png'));
@@ -211,7 +212,7 @@ module.exports = async function(cdp) {
   /* a real path through the OS "open with" route (a PNG on disk) */
   var nBeforePng = await cdp.eval('__km.items().length');
   cp.spawn(exe, (packaged ? [] : [ROOT]).concat(['--user-data-dir=' + prof, path.join(FIX, 'amber.png')]), { stdio: 'ignore', detached: true }).unref();
-  await cdp.sleep(2500);
+  await cdp.sleep(LAUNCH_WAIT);
   ok('30 an image opened by its real path is added', (await cdp.eval('__km.items().length')) === nBeforePng + 1, await cdp.eval('__km.items().length'));
 
   /* recovery copy */
