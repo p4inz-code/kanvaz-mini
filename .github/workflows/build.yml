@@ -47,7 +47,7 @@ jobs:
           cd dist
           sha256sum *.exe *.AppImage 2>/dev/null > SHA256SUMS-${{ matrix.os }}.txt || true
           cat SHA256SUMS-${{ matrix.os }}.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: kanvaz-mini-${{ matrix.os }}
           path: |
