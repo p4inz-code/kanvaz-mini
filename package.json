@@ -14,7 +14,7 @@
   },
   "devDependencies": {
     "electron": "44.10.0",
-    "electron-builder": "^26.0.0"
+    "electron-builder": "^26.18.0"
   },
   "build": {
     "appId": "com.p4inz.kanvazmini",
