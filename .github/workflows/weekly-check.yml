@@ -1,0 +1,20 @@
+name: Weekly check
+
+# Runs every Monday so a new npm advisory shows up within a week, even when nobody pushed.
+on:
+  schedule:
+    - cron: '45 3 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Unit tests and audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --audit-level=high
