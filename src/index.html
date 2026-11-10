@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'self'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; font-src 'none'; media-src 'none'">
 <title>Kanvaz Mini</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -10,7 +10,9 @@
 <div id="stage" tabindex="0">
   <div id="world"></div>
   <div id="marquee" hidden></div>
+  <div id="guides" hidden></div>
 </div>
+<div id="palette" hidden><span id="palette-title">Palette</span><div id="swatches"></div><button id="palette-close" type="button" aria-label="Close palette">&times;</button></div>
 <div id="hint"><div class="hint-card"><b>Drop images here</b><span>or press Ctrl+V to paste. Ctrl+O opens a file.</span><small>Images and GIFs only. For video, 3D and PDF use Kanvaz.</small></div></div>
 <div id="bar">
   <div id="grip" title="Drag to move the window"></div>
@@ -35,6 +37,9 @@
       <span>Space or middle drag</span><span>Pan</span>
       <span>Arrows</span><span>Nudge, or step references</span>
       <span>Ctrl+[ / Ctrl+]</span><span>Window opacity</span>
+      <span>E</span><span>Palette of the picture: click a color to copy its hex</span>
+      <span>T</span><span>Guides: thirds, center cross, golden ratio</span>
+      <span>Ctrl+E</span><span>Export the board as a PNG</span>
       <span>P</span><span>Keep on top</span>
       <span>Ctrl+Alt+T</span><span>Click-through tracing</span>
       <span>Ctrl+Z / Ctrl+Y</span><span>Undo / redo</span>
@@ -46,6 +51,7 @@
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="board.js"></script>
+<script src="palette.js"></script>
 <script src="renderer.js"></script>
 </body>
 </html>

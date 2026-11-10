@@ -4,7 +4,19 @@
 
 <h1 align="center">Kanvaz Mini</h1>
 
-<p align="center">A small reference window that stays on top of your work.<br>Drop images in, keep them beside you, get on with drawing.</p>
+<p align="center"><b>A small reference window that stays on top of your work.</b><br>Drop images in, keep them beside you, get on with drawing.</p>
+
+<p align="center">
+  <a href="https://github.com/p4inz-code/kanvaz-mini/releases/latest"><img src="assets/readme/btn-get.svg" alt="Download Kanvaz Mini, free for Windows and Linux" width="260"></a>
+  <a href="https://p4inz-code.github.io/kanvaz/guide/kanvaz-mini.html"><img src="assets/readme/btn-guide.svg" alt="Read the guide" width="260"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/p4inz-code/kanvaz-mini/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/p4inz-code/kanvaz-mini?color=7c5cfc&label=release"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-7c5cfc"></a>
+  <img alt="No network" src="https://img.shields.io/badge/network-none-7c5cfc">
+  <a href="https://github.com/p4inz-code/kanvaz"><img alt="The full Kanvaz" src="https://img.shields.io/badge/the%20big%20one-Kanvaz-7c5cfc"></a>
+</p>
 
 <p align="center">
   <img src="docs/mini-board.png" alt="Kanvaz Mini showing eight reference images arranged into rows" width="100%">
@@ -27,11 +39,18 @@ Most days you do not need a whole board. You need three or four pictures next to
 - Turns images to grayscale with one key (`G`), so you can check values.
 - Has a click-through tracing mode (`Ctrl+Alt+T`): the window ignores the mouse so you can draw on the app underneath. Set the window opacity with `Ctrl+[` and `Ctrl+]`.
 - Steps through your references one at a time with the left and right arrow keys.
+- Shows the main colors of a picture (`E`). Click a swatch to copy its hex code.
+- Draws composition guides over the board (`T`): rule of thirds, center cross or golden ratio.
+- Exports the whole board as one PNG (`Ctrl+E`).
 - Opens PureRef `.pur` boards, with each image at its saved position and scale.
 - Saves boards as single `.kmini` files with the images inside.
 - Brings your last session back when you reopen it, so a quick close never loses your references.
 
 Mini shows images and GIFs only. Video, audio, 3D models, PDFs and Adobe files are refused with a short message. Open those in Kanvaz.
+
+<p align="center">
+  <img src="docs/mini-palette-guides.png" alt="Kanvaz Mini with the rule-of-thirds guides on and a five-color palette strip at the bottom" width="640">
+</p>
 
 <p align="center">
   <img src="docs/mini-small.png" alt="Kanvaz Mini at its default small size" width="480">
@@ -55,6 +74,8 @@ Press `?` in the app for the same list.
 | `H`, `V` | Flip left to right, flip top to bottom |
 | `G` | Grayscale on and off |
 | `A` | Arrange into rows |
+| `E` | Palette of the selection, or of the whole board. Click a color to copy it |
+| `T` | Cycle composition guides: thirds, center, golden ratio, off |
 | `Delete` | Remove the selection |
 | `Ctrl+Z`, `Ctrl+Y` | Undo, redo |
 | `Ctrl+A`, `Ctrl+D` | Select all, duplicate |
@@ -64,6 +85,7 @@ Press `?` in the app for the same list.
 | `P` | Keep on top on or off |
 | `Ctrl+Alt+T` | Click-through tracing mode |
 | `Ctrl+S` | Save the board |
+| `Ctrl+E` | Export the board as a PNG |
 | `?` | Show the key list |
 
 R, H, V and G act on the selection, or on everything when nothing is selected.
@@ -88,7 +110,7 @@ The Kanvaz user guide has a page for Mini, plus the FAQ, the troubleshooting pag
 
 ## Privacy and safety
 
-Mini makes no network requests at all. The app blocks them, and a test checks that. It asks for no permissions and stores nothing outside its own settings and recovery files. It runs sandboxed with a strict content security policy, reads only image files and boards from real local paths, and caps the size of what it reads. See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
+Mini makes no network requests at all. The app blocks them, and a test checks that. It asks for no permissions and stores nothing outside its own settings and recovery files. It runs sandboxed with a strict content security policy, accepts messages only from its own window, checks that a file really is an image by its contents (a renamed program is refused), reads only image files and boards from real local paths, and caps the size of what it reads. DevTools are off in the installed app. See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
 
 ## Build and test
 
@@ -100,7 +122,7 @@ npm run build:win
 npm run build:linux
 ```
 
-`npm test` runs the unit tests for the board logic and the file rules. The live checks drive the real app over the Chrome DevTools protocol (34 of them, including the built exe):
+`npm test` runs the unit tests for the board logic, the file rules and the palette code. The live checks drive the real app over the Chrome DevTools protocol (33 of them, including the built exe):
 
 ```powershell
 ./test/live/launch.ps1

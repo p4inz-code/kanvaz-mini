@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('KMBridge', {
   onClickThrough: function(fn) { ipcRenderer.on('click-through', function(e, on) { fn(!!on); }); },
   saveRecovery: function(text) { return ipcRenderer.invoke('recovery-save', String(text)); },
   loadRecovery: function() { return ipcRenderer.invoke('recovery-load'); },
+  copyText: function(t) { return ipcRenderer.invoke('copy-text', String(t)); },
+  savePng: function(d, name) { return ipcRenderer.invoke('save-png', String(d), name); },
   version: function() { return ipcRenderer.invoke('app-version'); },
   openDialog: function() { return ipcRenderer.invoke('open-dialog'); },
   saveBoard: function(text, suggested) { return ipcRenderer.invoke('save-board', String(text), suggested); },

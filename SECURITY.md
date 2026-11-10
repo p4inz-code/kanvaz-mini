@@ -12,6 +12,9 @@ If you think you found a security problem, please email atharva.patil.cg@gmail.c
 - A `.kmini` board is validated before it is loaded: only image data URLs, finite sizes, at most 500 items. SVG is refused.
 - A `.pur` file is parsed in a worker thread with a 30 second limit, and only image data comes back.
 - Boards and recovery copies are written atomically.
+- Messages from the window to the main process are accepted only from Mini's own page, and each one is validated.
+- A file counts as an image only if its contents match an image format, not just its name.
+- DevTools are disabled in the installed app.
 
 ## Known limits
 

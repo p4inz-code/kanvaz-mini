@@ -464,6 +464,89 @@
   }, { passive: false });
 
   /* ---------- keyboard ---------- */
+
+  /* ---------- palette: the main colors of the picture, click one to copy its hex ---------- */
+  var paletteEl = document.getElementById('palette');
+  var swatchesEl = document.getElementById('swatches');
+  function loadImg(src) {
+    return new Promise(function(res, rej) { var im = new Image(); im.onload = function() { res(im); }; im.onerror = function() { rej(new Error('decode')); }; im.src = src; });
+  }
+  function sampleItem(it) {
+    return loadImg(it.src).then(function(img) {
+      var w = 64, h = Math.max(1, Math.round(64 * img.naturalHeight / img.naturalWidth));
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
+      var x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(img, 0, 0, w, h);
+      return x.getImageData(0, 0, w, h).data;
+    });
+  }
+  function showPalette() {
+    var list = targets();
+    if (!list.length) { toast('Add a picture first'); return; }
+    Promise.all(list.slice(0, 12).map(function(it) { return sampleItem(it).catch(function() { return null; }); })).then(function(all) {
+      var merged = [];
+      all.forEach(function(d) { if (d) for (var i = 0; i < d.length; i++) merged.push(d[i]); });
+      var colors = KMPalette.extract(merged, 7);
+      if (!colors.length) { toast('No colors found'); return; }
+      swatchesEl.textContent = '';
+      colors.forEach(function(c) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'swatch'; b.title = 'Copy ' + c.hex;
+        b.style.background = c.hex;
+        var l = document.createElement('span'); l.textContent = c.hex;
+        b.appendChild(l);
+        b.addEventListener('click', function() { window.KMBridge.copyText(c.hex).then(function(r) { toast(r && r.ok ? 'Copied ' + c.hex : 'Could not copy'); }); });
+        swatchesEl.appendChild(b);
+      });
+      document.getElementById('palette-title').textContent = selItems().length ? 'Palette of selection' : 'Palette of the board';
+      paletteEl.hidden = false;
+    });
+  }
+  document.getElementById('palette-close').addEventListener('click', function() { paletteEl.hidden = true; });
+
+  /* ---------- composition guides: thirds, center cross, golden ratio ---------- */
+  var guidesEl = document.getElementById('guides');
+  var GUIDES = ['', 'thirds', 'center', 'golden'];
+  var guideIdx = 0;
+  function cycleGuides() {
+    guideIdx = (guideIdx + 1) % GUIDES.length;
+    guidesEl.className = GUIDES[guideIdx];
+    guidesEl.hidden = !GUIDES[guideIdx];
+    toast(['Guides off', 'Guides: rule of thirds', 'Guides: center cross', 'Guides: golden ratio'][guideIdx]);
+  }
+
+  /* ---------- export the whole board as one PNG ---------- */
+  function exportPng() {
+    if (!items.length) { toast('Nothing to export yet'); return; }
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    items.forEach(function(it) { minX = Math.min(minX, it.x); minY = Math.min(minY, it.y); maxX = Math.max(maxX, it.x + it.w); maxY = Math.max(maxY, it.y + it.h); });
+    var pad = 16, bw = maxX - minX + pad * 2, bh = maxY - minY + pad * 2;
+    var scale = Math.min(1, 8192 / Math.max(bw, bh), Math.sqrt(120e6 / (bw * bh)));
+    var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(bw * scale)); c.height = Math.max(1, Math.round(bh * scale));
+    var x = c.getContext('2d');
+    x.fillStyle = '#1a1730'; x.fillRect(0, 0, c.width, c.height);
+    toast('Exporting...');
+    items.reduce(function(chain, it) {
+      return chain.then(function() { return loadImg(it.src).then(function(img) {
+        var odd = (it.rot || 0) % 2 === 1;
+        x.save();
+        x.translate((it.x - minX + pad + it.w / 2) * scale, (it.y - minY + pad + it.h / 2) * scale);
+        x.rotate((it.rot || 0) * Math.PI / 2);
+        x.scale(it.fx ? -1 : 1, it.fy ? -1 : 1);
+        if (it.gray) x.filter = 'grayscale(1)';
+        var dw = (odd ? it.h : it.w) * scale, dh = (odd ? it.w : it.h) * scale;
+        x.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+        x.restore();
+      }); });
+    }, Promise.resolve()).then(function() {
+      var name = (boardPath ? boardPath.split(/[\\/]/).pop().replace(/\.kmini$/i, '') : 'board') + '.png';
+      return window.KMBridge.savePng(c.toDataURL('image/png'), name);
+    }).then(function(r) {
+      if (r && r.ok) toast('Exported the board as a PNG');
+      else if (!(r && r.canceled)) toast('Could not export');
+    }).catch(function() { toast('Could not export'); });
+  }
+
   document.addEventListener('keydown', function(e) {
     var k = e.key, kl = k.toLowerCase();
     var ctrl = e.ctrlKey || e.metaKey;
@@ -475,6 +558,7 @@
     if (ctrl && kl === 'n') { e.preventDefault(); newBoard(); return; }
     if (ctrl && kl === 's') { e.preventDefault(); saveBoard(); return; }
     if (ctrl && kl === 'o') { e.preventDefault(); openDialog(); return; }
+    if (ctrl && kl === 'e') { e.preventDefault(); exportPng(); return; }
     if (ctrl && k === '[') { e.preventDefault(); changeOpacity(-0.1); return; }
     if (ctrl && k === ']') { e.preventDefault(); changeOpacity(0.1); return; }
     if (ctrl || e.altKey) return;
@@ -488,9 +572,11 @@
     if (kl === 'h') { flipSel('x'); return; }
     if (kl === 'v') { flipSel('y'); return; }
     if (kl === 'g') { grayscaleSel(); return; }
+    if (kl === 'e') { showPalette(); return; }
+    if (kl === 't') { cycleGuides(); return; }
     if (kl === 'a') { arrangeSel(); return; }
     if (k === '?' || k === '/') { toggleHelp(); return; }
-    if (k === 'Escape') { var hp = document.getElementById('help'); if (!hp.hidden) { hp.hidden = true; return; } selected = {}; render(); return; }
+    if (k === 'Escape') { var hp = document.getElementById('help'); if (!hp.hidden) { hp.hidden = true; return; } if (!paletteEl.hidden) { paletteEl.hidden = true; return; } selected = {}; render(); return; }
     if (k.indexOf('Arrow') === 0) {
       e.preventDefault();
       var sel = selItems();

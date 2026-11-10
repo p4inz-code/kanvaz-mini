@@ -37,6 +37,19 @@ function isSafeLocalPath(p) {
   return /^[A-Za-z]:[\\/]/.test(p) || p.charAt(0) === '/';
 }
 
+/* what the file really is, from its first bytes: a renamed script or executable is refused even with a .png name */
+function sniffImage(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png';
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpeg';
+  if (buf.slice(0, 3).toString('latin1') === 'GIF') return 'gif';
+  if (buf.slice(0, 4).toString('latin1') === 'RIFF' && buf.slice(8, 12).toString('latin1') === 'WEBP') return 'webp';
+  if (buf[0] === 0x42 && buf[1] === 0x4d) return 'bmp';
+  return null;
+}
+function isHexColor(s) { return typeof s === 'string' && /^#[0-9a-fA-F]{6}$/.test(s); }
+function isPngDataUrl(s) { return typeof s === 'string' && s.length < 400 * 1024 * 1024 && /^data:image\/png;base64,[A-Za-z0-9+\/=]+$/.test(s); }
+
 function isNum(n) { return typeof n === 'number' && isFinite(n); }
 
 /* validate a board read from disk; returns { items, view } or null if it is not a Kanvaz Mini board */
@@ -64,5 +77,5 @@ function serializeBoard(items, view) {
 module.exports = {
   IMAGE_EXTS: IMAGE_EXTS, BOARD_EXT: BOARD_EXT, PUR_EXT: PUR_EXT, MAX_IMAGE_BYTES: MAX_IMAGE_BYTES, MAX_ITEMS: MAX_ITEMS,
   extOf: extOf, isImagePath: isImagePath, isBoardPath: isBoardPath, isPurPath: isPurPath, isRefused: isRefused, mimeFor: mimeFor,
-  isSafeLocalPath: isSafeLocalPath, parseBoard: parseBoard, serializeBoard: serializeBoard
+  isSafeLocalPath: isSafeLocalPath, sniffImage: sniffImage, isHexColor: isHexColor, isPngDataUrl: isPngDataUrl, parseBoard: parseBoard, serializeBoard: serializeBoard
 };

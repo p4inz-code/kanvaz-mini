@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.0] clearer colors, a tighter lock, and three tools for artists
+
+### Added
+- Palette (`E`): the main colors of the selected pictures, or of the whole board. Click a swatch to copy its hex code.
+- Composition guides (`T`): rule of thirds, center cross and golden ratio, drawn over the board.
+- Export the whole board as one PNG (`Ctrl+E`), with rotations, flips and grayscale applied.
+
+### Changed
+- Lighter colors. Text, borders, the dot grid and the top bar are brighter, and the top bar is more visible when you are not hovering it, so nothing looks washed out against a dark app.
+
+### Security
+- Every message to the main process is now checked: it must come from Mini's own window, loading Mini's own page.
+- A file is accepted as an image only if its first bytes match PNG, JPEG, GIF, WebP or BMP. A program or script renamed to `.png` is refused. SVG still is.
+- The content security policy now also blocks connections, frames, forms, plugins, fonts and media outright.
+- DevTools and its shortcuts are turned off in the installed app, and web views are disabled.
+- Copying a color and exporting a PNG only accept a plain `#rrggbb` code and a real PNG data URL.
+
 ## [0.1.0] first release
 
 Kanvaz Mini is a separate, smaller app from Kanvaz: a quick reference window you drop images into.

@@ -63,7 +63,7 @@ function createWindow() {
     minWidth: MIN_W, minHeight: MIN_H,
     frame: false,
     show: false,
-    backgroundColor: '#14121f',
+    backgroundColor: '#1a1730',
     alwaysOnTop: s.alwaysOnTop !== false,
     title: 'Kanvaz Mini',
     icon: path.join(__dirname, '..', 'assets', 'icon.png'),
@@ -73,7 +73,9 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
-      spellcheck: false
+      spellcheck: false,
+      devTools: !app.isPackaged,
+      webviewTag: false
     }
   });
   if (typeof s.opacity === 'number' && s.opacity >= 0.2 && s.opacity <= 1) win.setOpacity(s.opacity);
@@ -83,6 +85,11 @@ function createWindow() {
   win.once('ready-to-show', function() { win.show(); });
   win.webContents.setWindowOpenHandler(function() { return { action: 'deny' }; });
   win.webContents.on('will-navigate', function(e) { e.preventDefault(); });
+  win.webContents.on('will-attach-webview', function(e) { e.preventDefault(); });
+  win.webContents.on('before-input-event', function(e, input) {
+    /* no DevTools shortcuts in a packaged app */
+    if (app.isPackaged && ((input.control || input.meta) && input.shift && /^i$/i.test(input.key) || input.key === 'F12')) e.preventDefault();
+  });
   win.webContents.on('did-finish-load', function() {
     if (pendingOpen.length) { win.webContents.send('open-files', pendingOpen); pendingOpen = []; }
   });
@@ -148,6 +155,18 @@ app.on('will-quit', function() { try { electron.globalShortcut.unregisterAll(); 
 
 app.on('window-all-closed', function() { app.quit(); });
 
+/* only our own window, loading our own index.html, may talk to the main process */
+function trusted(e) {
+  try {
+    if (!win || win.isDestroyed() || e.sender !== win.webContents) return false;
+    var u = e.senderFrame && e.senderFrame.url || '';
+    return /^file:\/\/\/.*\/src\/index\.html$/i.test(u.split(String.fromCharCode(92)).join('/')) && e.senderFrame === win.webContents.mainFrame;
+  } catch (err) { return false; }
+}
+var _handle = ipcMain.handle.bind(ipcMain), _on = ipcMain.on.bind(ipcMain);
+ipcMain.handle = function(ch, fn) { _handle(ch, function(e) { if (!trusted(e)) return { ok: false, reason: 'untrusted' }; return fn.apply(null, arguments); }); };
+ipcMain.on = function(ch, fn) { _on(ch, function(e) { if (!trusted(e)) return; fn.apply(null, arguments); }); };
+
 /* ---------- IPC ---------- */
 ipcMain.handle('toggle-click-through', function() { setClickThrough(!clickThrough); return clickThrough; });
 ipcMain.handle('is-click-through', function() { return clickThrough; });
@@ -190,6 +209,7 @@ ipcMain.handle('read-image', function(e, p) {
     if (!st.isFile()) return { ok: false, reason: 'not-file' };
     if (st.size > files.MAX_IMAGE_BYTES) return { ok: false, reason: 'too-big' };
     var buf = fs.readFileSync(p);
+    if (!files.sniffImage(buf)) return { ok: false, reason: 'not-image' };   /* the contents must really be an image */
     return { ok: true, name: path.basename(p), src: 'data:' + files.mimeFor(p) + ';base64,' + buf.toString('base64') };
   } catch (err) { return { ok: false, reason: 'unreadable' }; }
 });
@@ -248,5 +268,26 @@ ipcMain.handle('save-board', function(e, text, suggested) {
     if (r.canceled || !r.filePath) return { ok: false, canceled: true };
     var p = /\.kmini$/i.test(r.filePath) ? r.filePath : r.filePath + '.' + files.BOARD_EXT;
     try { fs.writeFileSync(p, text, 'utf8'); return { ok: true, path: p }; } catch (err) { return { ok: false }; }
+  });
+});
+
+/* copy a color (#rrggbb) to the system clipboard, validated */
+ipcMain.handle('copy-text', function(e, text) {
+  if (!files.isHexColor(text)) return { ok: false };
+  electron.clipboard.writeText(text);
+  return { ok: true };
+});
+
+/* save the board as a PNG picture (the renderer draws it; only a PNG data URL is accepted) */
+ipcMain.handle('save-png', function(e, dataUrl, suggested) {
+  if (!files.isPngDataUrl(dataUrl)) return { ok: false };
+  return dialog.showSaveDialog(win, {
+    title: 'Export as PNG',
+    defaultPath: typeof suggested === 'string' && suggested ? suggested : 'board.png',
+    filters: [{ name: 'PNG image', extensions: ['png'] }]
+  }).then(function(r) {
+    if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+    var p = /\.png$/i.test(r.filePath) ? r.filePath : r.filePath + '.png';
+    try { fs.writeFileSync(p, Buffer.from(dataUrl.slice('data:image/png;base64,'.length), 'base64')); return { ok: true, path: p }; } catch (err) { return { ok: false }; }
   });
 });
