@@ -13,7 +13,7 @@
     "build:linux": "electron-builder --linux --publish never"
   },
   "devDependencies": {
-    "electron": "44.10.0",
+    "electron": "45.4.1",
     "electron-builder": "^26.0.0"
   },
   "build": {
